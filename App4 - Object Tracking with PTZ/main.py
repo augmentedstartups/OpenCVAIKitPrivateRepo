@@ -24,11 +24,11 @@ import Adafruit_PCA9685
 
 pwm = Adafruit_PCA9685.PCA9685()
 posX = 300
-posY = 450
-speedX = 2
+posY = 150
+speedX = 1
 speedY = 2
 ThresholdX = 20
-ThresholdY = 20
+ThresholdY = 10
 
 class TCPServerRequest(socketserver.BaseRequestHandler):
     def handle(self):
@@ -133,7 +133,7 @@ while True:
             img_w = frame.shape[1]
 
             for detection in detections:
-                if detection.label ==5:# If person is detected
+                if detection.label ==15:# If person is detected
                     left, top = int(detection.x_min * img_w), int(detection.y_min * img_h)
                     right, bottom = int(detection.x_max * img_w), int(detection.y_max * img_h)
                     #print(detection.label)
@@ -152,15 +152,23 @@ while True:
                    
                         ### Vertical
                     if cy!=0:
-                        print(int(ImageCenterY-cy))
-                        print(posY)
+                        #print(int(ImageCenterY-cy))
+                        #print(posY)
                         if cy>ImageCenterY +ThresholdY:
-                            posY = int(np.clip(posY-speedY,300,600))
+                            posY = int(np.clip(posY+speedY,320,580))
                         elif cy<ImageCenterY-ThresholdY:
-                            posY =  int(np.clip(posY+speedY,300,600))
+                            posY =  int(np.clip(posY-speedY,320,580))
                         threading.Thread(target=pwm.set_pwm(0, 0, posY)).start()
                         
-              
+                        ### Horizontal
+                    if cx!=0:
+                        #print(int(ImageCenterX-cx))
+                        #print(posX)
+                        if cx>ImageCenterX +ThresholdX:
+                            posX = int(np.clip(posX-speedX,150,650))
+                        elif cx<ImageCenterX-ThresholdX:
+                            posX =  int(np.clip(posX+speedX,150,650))
+                        threading.Thread(target=pwm.set_pwm(1, 0, posX)).start()              
         
                     #threading.Thread(target=pwm.set_pwm(0, 0, servo_max)).start()
 
