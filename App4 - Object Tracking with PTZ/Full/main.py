@@ -19,9 +19,16 @@ from PIL import Image
 import time
 
 # Import the PCA9685 module.
+import Adafruit_PCA9685
 
-#Initialize variables
 
+pwm = Adafruit_PCA9685.PCA9685()
+posX = 300
+posY = 150
+speedX = 1
+speedY = 2
+ThresholdX = 20
+ThresholdY = 10
 
 class TCPServerRequest(socketserver.BaseRequestHandler):
     def handle(self):
@@ -60,13 +67,23 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
     pass
 
-
+# Configure min and max servo pulse lengths
+servo_min = 300  # Min pulse length out of 4096
+servo_max = 600 # Max pulse length out of 4096
 
 # Helper function to make setting a servo pulse width simpler.
-
+def set_servo_pulse(channel, pulse):
+    pulse_length = 1000000    # 1,000,000 us per second
+    pulse_length //= 60       # 60 Hz
+    print('{0}us per period'.format(pulse_length))
+    pulse_length //= 4096     # 12 bits of resolution
+    print('{0}us per bit'.format(pulse_length))
+    pulse *= 1000
+    pulse //= pulse_length
+    pwm.set_pwm(channel, 0, pulse)
 
 # Set frequency to 60hz, good for servos.
-
+pwm.set_pwm_freq(60)
 
 # start TCP data server
 server_TCP = socketserver.TCPServer(("192.168.0.117", 8070), TCPServerRequest)
@@ -116,7 +133,7 @@ while True:
             img_w = frame.shape[1]
 
             for detection in detections:
-                # Filter for People
+                if detection.label ==15:# If person is detected
                     left, top = int(detection.x_min * img_w), int(detection.y_min * img_h)
                     right, bottom = int(detection.x_max * img_w), int(detection.y_max * img_h)
                     #print(detection.label)
@@ -124,15 +141,36 @@ while True:
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                     
                     ##### Finding BBOX center ####
+                    cx = int(left + (right-left)/2)
+                    cy = int(top + (bottom-top)/2)
+                    # Draw Line
+                    ImageCenterX, ImageCenterY = int(img_w/2), int(img_h/2) #Center coordinates
+                    line_thickness = 2
+                    cv2.line(frame, (ImageCenterX,ImageCenterY ), (cx, cy), (0, 255, 0), thickness=line_thickness)
                     
-                    ###Servo Motor Control ###
+                    ####Servo Motor Control ####
                    
-                        ### Vertical Motor Control
-                    
+                        ### Vertical
+                    if cy!=0:
+                        #print(int(ImageCenterY-cy))
+                        #print(posY)
+                        if cy>ImageCenterY +ThresholdY:
+                            posY = int(np.clip(posY+speedY,320,580))
+                        elif cy<ImageCenterY-ThresholdY:
+                            posY =  int(np.clip(posY-speedY,320,580))
+                        threading.Thread(target=pwm.set_pwm(0, 0, posY)).start()
                         
-                        ### Horizontal Motor Control
-                              
-    
+                        ### Horizontal
+                    if cx!=0:
+                        #print(int(ImageCenterX-cx))
+                        #print(posX)
+                        if cx>ImageCenterX +ThresholdX:
+                            posX = int(np.clip(posX-speedX,150,650))
+                        elif cx<ImageCenterX-ThresholdX:
+                            posX =  int(np.clip(posX+speedX,150,650))
+                        threading.Thread(target=pwm.set_pwm(1, 0, posX)).start()              
+        
+                    #threading.Thread(target=pwm.set_pwm(0, 0, servo_max)).start()
 
 
             server_TCP.datatosend = json.dumps([detection.get_dict() for detection in detections])
